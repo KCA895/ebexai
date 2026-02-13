@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EbexAI - Smart Chatbot</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Interactive Bubble Background -->
+    <canvas id="bubble-canvas" class="bubble-canvas"></canvas>
+
+    <!-- Login Screen -->
+    <div id="auth-container" class="auth-container">
+        <div class="auth-box">
+            <div class="auth-logo">
+                <div class="logo-icon">
+                    <img src="ebexgramlogo.png" alt="EbexAI Logo" width="80" height="80" />
+                </div>
+                <h1>EbexAI</h1>
+                <p class="subtitle">Your Intelligent Assistant</p>
+            </div>
+
+            <!-- Email/Password Login -->
+            <div id="email-auth" class="auth-section">
+                <div class="input-group">
+                    <svg class="input-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M2.5 6.66667L9.0755 11.0504C9.63533 11.4236 10.3647 11.4236 10.9245 11.0504L17.5 6.66667M4.16667 15H15.8333C16.7538 15 17.5 14.2538 17.5 13.3333V6.66667C17.5 5.74619 16.7538 5 15.8333 5H4.16667C3.24619 5 2.5 5.74619 2.5 6.66667V13.3333C2.5 14.2538 3.24619 15 4.16667 15Z" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <input type="email" id="email" placeholder="Email address" />
+                </div>
+                <div class="input-group">
+                    <svg class="input-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M5.83333 9.16667V6.66667C5.83333 4.36548 7.69881 2.5 10 2.5C12.3012 2.5 14.1667 4.36548 14.1667 6.66667V9.16667M10 11.6667V13.3333M6.66667 17.5H13.3333C14.2538 17.5 15 16.7538 15 15.8333V10.8333C15 9.91286 14.2538 9.16667 13.3333 9.16667H6.66667C5.74619 9.16667 5 9.91286 5 10.8333V15.8333C5 16.7538 5.74619 17.5 6.66667 17.5Z" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <input type="password" id="password" placeholder="Password" />
+                </div>
+                <button onclick="emailLogin()" class="btn-primary">
+                    <span>Sign In</span>
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M4.16667 10H15.8333M15.8333 10L10.8333 5M15.8333 10L10.8333 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <button onclick="emailSignup()" class="btn-secondary">Create Account</button>
+            </div>
+
+            <div class="divider">
+                <span>or continue with</span>
+            </div>
+
+            <!-- Social Login -->
+            <div class="social-buttons">
+                <button onclick="googleLogin()" class="btn-google">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M18.1711 8.36788H17.5V8.33329H10V11.6666H14.7095C14.0225 13.6069 12.1761 15 10 15C7.23883 15 5.00008 12.7612 5.00008 9.99996C5.00008 7.23871 7.23883 4.99996 10 4.99996C11.2745 4.99996 12.4342 5.48079 13.317 6.26621L15.6742 3.90913C14.1858 2.52204 12.195 1.66663 10 1.66663C5.39758 1.66663 1.66675 5.39746 1.66675 9.99996C1.66675 14.6025 5.39758 18.3333 10 18.3333C14.6026 18.3333 18.3334 14.6025 18.3334 9.99996C18.3334 9.44121 18.2759 8.89579 18.1711 8.36788Z" fill="#FFC107"/>
+                        <path d="M2.62756 6.12121L5.36548 8.12913C6.10631 6.29496 7.90048 4.99996 10.0001 4.99996C11.2746 4.99996 12.4343 5.48079 13.3171 6.26621L15.6743 3.90913C14.1859 2.52204 12.1951 1.66663 10.0001 1.66663C6.79923 1.66663 4.02339 3.47371 2.62756 6.12121Z" fill="#FF3D00"/>
+                        <path d="M9.99992 18.3334C12.1524 18.3334 14.1083 17.5096 15.5871 16.17L13.0079 13.9875C12.1431 14.6452 11.0864 15.0009 9.99992 15C7.83242 15 5.99209 13.6179 5.29876 11.6892L2.58167 13.7829C3.96084 16.4817 6.76126 18.3334 9.99992 18.3334Z" fill="#4CAF50"/>
+                        <path d="M18.1712 8.36796H17.5V8.33337H10V11.6667H14.7096C14.3809 12.5902 13.7889 13.3972 13.007 14.0003L13.0079 13.9996L15.5871 16.182C15.4046 16.3479 18.3334 14.1667 18.3334 10C18.3334 9.44129 18.2758 8.89587 18.1712 8.36796Z" fill="#1976D2"/>
+                    </svg>
+                    <span>Google</span>
+                </button>
+                <button onclick="anonymousLogin()" class="btn-anonymous">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M10 10C12.0711 10 13.75 8.32107 13.75 6.25C13.75 4.17893 12.0711 2.5 10 2.5C7.92893 2.5 6.25 4.17893 6.25 6.25C6.25 8.32107 7.92893 10 10 10Z" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M3.75 17.5C3.75 14.7386 6.23858 12.5 9.25 12.5H10.75C13.7614 12.5 16.25 14.7386 16.25 17.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <span>Guest</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Interface -->
+    <div id="chat-container" class="chat-container" style="display: none;">
+        <!-- Sidebar -->
+        <div class="chat-sidebar" id="chat-sidebar">
+            <div class="sidebar-header">
+                <button onclick="toggleSidebar()" class="sidebar-toggle-btn" title="Toggle sidebar">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M3 5H17M3 10H17M3 15H17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+                <button onclick="createNewChat()" class="btn-new-chat" title="New chat">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M10 4V16M4 10H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <span>New Chat</span>
+                </button>
+            </div>
+
+            <div class="chat-search">
+                <div class="search-wrapper">
+                    <svg class="search-icon" width="16" height="16" viewBox="0 0 20 20" fill="none">
+                        <path d="M17.5 17.5L13.875 13.875M15.8333 9.16667C15.8333 12.8486 12.8486 15.8333 9.16667 15.8333C5.48477 15.8333 2.5 12.8486 2.5 9.16667C2.5 5.48477 5.48477 2.5 9.16667 2.5C12.8486 2.5 15.8333 5.48477 15.8333 9.16667Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <input type="text" id="chat-search" class="search-input" placeholder="Search chats..." oninput="searchChats(this.value)" />
+                </div>
+            </div>
+
+            <div class="sidebar-content">
+                <div class="chat-groups">
+                    <div class="chat-group" id="group-pinned" style="display: none;">
+                        <div class="group-header">📌 Pinned</div>
+                        <div id="chats-pinned" class="chat-list"></div>
+                    </div>
+                    <div class="chat-group" id="group-today">
+                        <div class="group-header">Today</div>
+                        <div id="chats-today" class="chat-list"></div>
+                    </div>
+                    <div class="chat-group" id="group-yesterday">
+                        <div class="group-header">Yesterday</div>
+                        <div id="chats-yesterday" class="chat-list"></div>
+                    </div>
+                    <div class="chat-group" id="group-week">
+                        <div class="group-header">Previous 7 Days</div>
+                        <div id="chats-week" class="chat-list"></div>
+                    </div>
+                    <div class="chat-group" id="group-older">
+                        <div class="group-header">Older</div>
+                        <div id="chats-older" class="chat-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button onclick="logout()" class="btn-sidebar-action">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M7.5 17.5H4.16667C3.72464 17.5 3.30072 17.3244 2.98816 17.0118C2.67559 16.6993 2.5 16.2754 2.5 15.8333V4.16667C2.5 3.72464 2.67559 3.30072 2.98816 2.98816C3.30072 2.67559 3.72464 2.5 4.16667 2.5H7.5M13.3333 14.1667L17.5 10M17.5 10L13.3333 5.83333M17.5 10H7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    Logout
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="chat-main">
+            <div class="chat-header">
+                <div class="header-left">
+                    <button onclick="toggleSidebar()" class="icon-btn mobile-menu-btn" title="Menu">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M3 5H17M3 10H17M3 15H17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                    <div class="logo-small">
+                        <img src="ebexgramlogo.png" alt="EbexAI" width="40" height="40" style="border-radius: 8px;" />
+                    </div>
+                    <div>
+                        <h2 id="chat-title">EbexAI</h2>
+                        <span class="status">
+                            <span class="status-dot"></span>
+                            Online
+                        </span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button onclick="renameCurrentChat()" class="icon-btn" title="Rename chat">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M14.1667 2.5C14.3856 2.28113 14.6454 2.10752 14.9313 1.98906C15.2171 1.87061 15.5236 1.80965 15.8333 1.80965C16.1431 1.80965 16.4496 1.87061 16.7354 1.98906C17.0213 2.10752 17.281 2.28113 17.5 2.5C17.7189 2.71887 17.8925 2.97863 18.0109 3.26449C18.1294 3.55035 18.1904 3.85688 18.1904 4.16667C18.1904 4.47645 18.1294 4.78298 18.0109 5.06884C17.8925 5.3547 17.7189 5.61446 17.5 5.83333L6.25 17.0833L1.66667 18.3333L2.91667 13.75L14.1667 2.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <button onclick="deleteCurrentChat()" class="icon-btn" title="Delete chat">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M2.5 5H4.16667M4.16667 5H17.5M4.16667 5V16.6667C4.16667 17.1087 4.34226 17.5326 4.65482 17.8452C4.96738 18.1577 5.39131 18.3333 5.83333 18.3333H14.1667C14.6087 18.3333 15.0326 18.1577 15.3452 17.8452C15.6577 17.5326 15.8333 17.1087 15.8333 16.6667V5H4.16667ZM6.66667 5V3.33333C6.66667 2.89131 6.84226 2.46738 7.15482 2.15482C7.46738 1.84226 7.89131 1.66667 8.33333 1.66667H11.6667C12.1087 1.66667 12.5326 1.84226 12.8452 2.15482C13.1577 2.46738 13.3333 2.89131 13.3333 3.33333V5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div id="chat-messages" class="chat-messages">
+            <div class="welcome-message">
+                <div class="welcome-icon">
+                    <img src="IMG_20241005_231150.jpg" alt="EbexAI" width="80" height="80" style="border-radius: 16px;" />
+                </div>
+                <h3>Hai, gw EBEX AI</h3>
+                <p>Asisten yang gak dibayar, jadi males banget.</p>
+                <p style="font-size: 14px; margin-top: 8px; opacity: 0.8;">Tapi yaudah deh gw bantuin. Tanya aja.</p>
+            </div>
+        </div>
+
+            <div class="chat-input-container">
+                <div class="input-wrapper">
+                    <input
+                        type="text"
+                        id="chat-input"
+                        placeholder="Type your message..."
+                        onkeypress="handleKeyPress(event)"
+                    />
+                    <button onclick="sendMessage()" class="btn-send">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M2.5 10L17.5 2.5L10 17.5L8.33333 10.8333L2.5 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="bubble-background.js"></script>
+    <script type="module" src="app.js?v=1707885026"></script>
+</body>
+</html>
