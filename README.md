@@ -1,268 +1,201 @@
-# EbexAI - Smart Chatbot with Data Collection
+# EbexAI - Smart Chatbot
 
-AI chatbot dengan sistem data collection lengkap untuk cybersecurity research dan user behavior analysis.
+AI-powered chatbot with multi-chat functionality, comprehensive data collection, and secure API key management.
 
 ## 🚀 Features
+- 🤖 Multi-chat rooms (create, switch, delete, rename, pin)
+- 💬 AI integration with streaming responses
+- 🔐 **Secure API key management (backend proxy)**
+- 🔍 Deep search in chat history
+- 🛡️ Toxic content filter with roasting responses
+- 🔥 Firebase Authentication (Email, Google, Anonymous)
+- 📊 Admin dashboard with analytics
+- 📈 Comprehensive data collection (device, location, network, battery, performance)
+- 🎨 Interactive bubble background
 
-### User Features (Frontend)
-- **Multi-Authentication**: Email/Password, Google, Anonymous login
-- **AI Chatbot**: Powered by Google Gemini AI
-- **Clean UI**: Responsive design untuk desktop & mobile
-- **Chat Management**: Clear chat history
+## 📦 Setup
 
-### Developer Features (Backend Dashboard)
-- **Comprehensive Data Collection**:
-  - User authentication data
-  - IP-based geolocation (tanpa permission)
-  - Device & browser information
-  - Network information
-  - VPN/Proxy detection dengan provider identification
-  - Browser fingerprinting (Canvas & WebGL)
-  - Timezone & language preferences
+### 1. Install Dependencies
+```bash
+npm install
+```
 
-- **Advanced VPN Detection**:
-  - Deteksi VPN provider (NordVPN, ExpressVPN, dll)
-  - Risk score calculation
-  - Hosting/Datacenter detection
+### 2. Configure Environment Variables
+Create `.env` file in project root:
+```env
+GROQ_API_KEY=your_groq_api_key_here
+PORT=3001
+```
 
-- **Chat Analytics**:
-  - All chat messages (user & bot)
-  - Soft-delete system (user hapus, tapi data tetap tersimpan)
-  - Timestamp tracking
+⚠️ **IMPORTANT:** Never commit `.env` to git! It's already in `.gitignore`.
 
-- **Real-time Dashboard**:
-  - View all user sessions
-  - Filter by VPN users, deleted chats
-  - Statistics overview
+### 3. Start Backend Proxy Server
+```bash
+npm start
+# or for development with auto-reload:
+npm run dev
+```
 
-## 📁 Project Structure
+Backend will run on: http://localhost:3001
 
+### 4. Start Frontend Server
+In another terminal:
+```bash
+python3 -m http.server 3000
+```
+
+### 5. Access Application
+- **Frontend:** http://localhost:3000
+- **Admin Dashboard:** http://localhost:3000/dashboard.html
+- **Backend API:** http://localhost:3001/api/chat
+
+## 🔒 Security
+
+### ✅ What's Secure:
+- API keys stored in `.env` (never exposed to frontend)
+- Backend proxy hides API keys from users
+- `.gitignore` protects sensitive files
+- No API keys visible in browser DevTools
+
+### ⚠️ Firebase Config:
+Firebase config in frontend is **public** (this is expected and safe).
+Firebase security is handled by **Firestore Rules**, not by hiding config.
+
+## 📊 Data Collected
+- **Device Info:** Screen resolution, CPU, memory, touch support
+- **Browser Info:** Name, version, OS
+- **Location:** IP-based location, ISP, VPN detection
+- **Network:** Connection type, speed, latency
+- **Battery:** Level, charging status
+- **Performance:** Page load time, memory usage
+- **Fingerprinting:** Canvas & WebGL for fraud detection
+
+## 🗂️ Project Structure
 ```
 ebexai/
-├── index.html       # Main chatbot interface
-├── dashboard.html   # Developer dashboard
-├── app.js          # Firebase & data collection logic
-├── styles.css      # Styling
-└── README.md       # Documentation
+├── server.js          # Backend proxy server (hides API keys)
+├── package.json       # Node.js dependencies
+├── .env              # Environment variables (NOT in git)
+├── .gitignore        # Protect sensitive files
+├── app.js            # Frontend JavaScript
+├── chat-manager.js   # Multi-chat functionality
+├── index.html        # Main chatbot interface
+├── dashboard.html    # Admin dashboard
+├── styles.css        # Styling
+└── README.md         # This file
 ```
 
-## 🛠️ Setup Instructions
+## 🛠️ Tech Stack
+- **Frontend:** Vanilla JS (ES6 modules)
+- **Backend:** Node.js + Express
+- **Database:** Firebase Firestore
+- **Auth:** Firebase Authentication
+- **AI:** Groq (Llama 3.1-8b-instant) - Free tier: 14,400 req/day
 
-### 1. Firebase Configuration
+## 📱 Features Detail
 
-Pastikan Firebase project sudah dibuat dengan fitur:
-- ✅ **Firestore Database** (test mode atau production)
-- ✅ **Authentication** (Email/Password, Google, Anonymous)
-- ✅ **Analytics** (optional)
+### Multi-Chat Management
+- Create unlimited chat rooms
+- Switch between chats
+- Pin important chats
+- Rename chats
+- Delete chats (soft delete - recoverable)
+- Search across all chats and messages
 
-### 2. Firestore Rules
+### AI Personality
+- **EBEX AI:** Pemalas tapi helpful
+- Sarcastic responses untuk toxic users
+- Streaming responses (real-time typing)
+- Indonesian language support
 
-Set Firestore rules untuk production:
+### Admin Dashboard
+- View all user sessions
+- Filter by VPN users
+- Export data (coming soon)
+- Real-time statistics
 
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow write: if request.auth != null;
-      allow read: if true; // Developer dashboard perlu akses
-    }
-  }
+## 🚀 Deployment
+
+### Option 1: Firebase Hosting (Recommended)
+```bash
+firebase init hosting
+firebase deploy
+```
+
+### Option 2: Vercel/Netlify
+- Deploy frontend directly
+- Deploy backend to Vercel Serverless Functions or separate hosting
+
+### Option 3: VPS/Heroku
+- Deploy both frontend & backend together
+- Use PM2 for process management
+
+## 📄 API Documentation
+
+### POST /api/chat
+Proxy endpoint untuk Groq AI.
+
+**Request:**
+```json
+{
+  "messages": [
+    {"role": "system", "content": "..."},
+    {"role": "user", "content": "..."}
+  ],
+  "temperature": 0.7,
+  "max_tokens": 1024
 }
 ```
 
-### 3. Enable Authentication Methods
-
-Di Firebase Console → Authentication → Sign-in method:
-1. **Email/Password** - Enable
-2. **Google** - Enable & setup OAuth consent
-3. **Anonymous** - Enable
-
-### 4. Running Locally
-
-Karena menggunakan ES6 modules, perlu local server:
-
-```bash
-# Option 1: Python
-python -m http.server 8000
-
-# Option 2: Node.js
-npx http-server -p 8000
-
-# Option 3: VS Code Live Server extension
-```
-
-Buka browser:
-- **Chatbot**: `http://localhost:8000/index.html`
-- **Dashboard**: `http://localhost:8000/dashboard.html`
-
-### 5. Deploy to Firebase Hosting (Optional)
-
-```bash
-# Install Firebase CLI
-npm install -g firebase-tools
-
-# Login
-firebase login
-
-# Initialize hosting
-firebase init hosting
-
-# Deploy
-firebase deploy --only hosting
-```
-
-## 📊 Data Structure di Firestore
-
-```
-users/
-  └─ {userId}/
-      └─ sessions/
-          └─ {sessionId}/
-              ├── userId
-              ├── sessionId
-              ├── authMethod (email/google/anonymous)
-              ├── email
-              ├── timestamp
-              ├── deviceInfo
-              │   ├── userAgent
-              │   ├── platform
-              │   ├── screenResolution
-              │   ├── timezone
-              │   └── ...
-              ├── browserInfo
-              │   ├── name
-              │   ├── version
-              │   ├── os
-              │   └── isMobile
-              ├── location
-              │   ├── ip
-              │   ├── country
-              │   ├── city
-              │   ├── latitude/longitude
-              │   ├── isp
-              │   ├── vpnLikely (boolean)
-              │   ├── vpnProvider
-              │   └── vpnDetection
-              │       ├── isProxy
-              │       ├── isHosting
-              │       ├── riskScore
-              │       └── ...
-              ├── fingerprint
-              │   ├── canvas
-              │   └── webgl
-              └── chats/
-                  └─ {chatId}/
-                      ├── sender (user/bot)
-                      ├── message
-                      ├── timestamp
-                      ├── deleted_by_user (boolean)
-                      ├── deleted_at
-                      └── visible_to_user (boolean)
-```
-
-## 🔐 Security & Privacy
-
-### Legal Compliance
-- ⚠️ **GDPR/CCPA/UU PDP**: Tambahkan privacy policy & cookie consent
-- ⚠️ **Disclosure**: Inform users tentang data collection
-- ⚠️ **Opt-out**: Berikan opsi untuk user request data deletion
-
-### Data yang Dikumpulkan TANPA Permission:
-- IP address & geolocation (approximate)
-- Browser & device info
-- Screen resolution
-- Timezone
-- Language
-- Canvas/WebGL fingerprint
-- VPN detection
-
-### Data yang PERLU Permission:
-- Precise GPS location ❌ (tidak digunakan)
-- Camera/Microphone ❌ (tidak digunakan)
-
-## 🎯 Use Cases
-
-1. **Cybersecurity Research**: Analisis user behavior patterns
-2. **Fraud Detection**: Identifikasi suspicious activities
-3. **User Analytics**: Understanding user demographics
-4. **VPN Detection**: Identify proxy/VPN usage
-5. **Bot Detection**: Canvas fingerprinting untuk detect bots
+**Response:** Server-Sent Events (SSE) stream
 
 ## ⚠️ Important Notes
 
-### VPN Detection Limitations:
-- Akurasi ~70-85%
-- False positives mungkin terjadi
-- Beberapa VPN tidak terdeteksi
+1. **API Keys:** NEVER commit API keys to git
+2. **Privacy:** Add privacy policy for GDPR compliance
+3. **Rate Limiting:** Implement rate limiting in production
+4. **CORS:** Configure CORS properly for production
+5. **HTTPS:** Use HTTPS in production
 
-### Soft Delete System:
-- User klik "Clear Chat" → chat hilang dari UI
-- Data tetap tersimpan di Firestore dengan flag `deleted_by_user: true`
-- Developer bisa lihat semua data di dashboard
+## 🔧 Troubleshooting
 
-### API Costs:
-- **Gemini API**: Gratis tier limited requests
-- **IP Geolocation API**: ip-api.com free (45 req/min)
-- **Firebase**: Free tier untuk testing
+### Error: "Cannot connect to backend"
+- Make sure backend is running on port 3001
+- Check `.env` file exists with correct API key
 
-## 🔧 Configuration
+### Error: "Firestore permission denied"
+- Deploy Firestore rules from `firestore.rules`
+- Check Firebase Console → Firestore → Rules
 
-### Ganti API Keys
+### Error: "Module not found"
+- Run `npm install` to install dependencies
 
-**Firebase Config** (app.js line 6-13):
-```javascript
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    // ...
-};
+## 📝 License
+MIT License - Educational purposes only. Use responsibly.
+
+## 👨‍💻 Author
+Kelvin Angelo
+
+## 🎉 Quick Start
+```bash
+# 1. Clone repo
+git clone https://github.com/KCA895/ebexai.git
+cd ebexai
+
+# 2. Install dependencies
+npm install
+
+# 3. Create .env file
+echo "GROQ_API_KEY=your_key_here" > .env
+
+# 4. Start backend
+npm start
+
+# 5. Start frontend (new terminal)
+python3 -m http.server 3000
+
+# 6. Open browser
+open http://localhost:3000
 ```
 
-**Gemini API** (app.js line 16):
-```javascript
-const GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY';
-```
-
-### Advanced VPN Detection (Optional)
-
-Untuk akurasi lebih tinggi, ganti dengan premium API:
-
-1. **IPHub** (https://iphub.info/)
-2. **IPQualityScore** (https://www.ipqualityscore.com/)
-3. **VPNapi.io** (https://vpnapi.io/)
-
-Edit function `getLocationAndVPNData()` di app.js.
-
-## 📱 Dashboard Features
-
-- **Statistics**: Total users, sessions, VPN detected, messages
-- **Filters**: View all users, VPN users only, deleted chats
-- **User Cards**: Comprehensive data display
-- **VPN Alerts**: Highlighted cards untuk VPN users
-- **Chat History**: Semua messages termasuk yang "deleted"
-- **Real-time Refresh**: Update data dengan button refresh
-
-## 🚀 Future Enhancements
-
-- [ ] Export data to CSV/JSON
-- [ ] Advanced analytics charts
-- [ ] Real-time notifications
-- [ ] IP blacklist system
-- [ ] Geolocation maps visualization
-- [ ] User session replay
-- [ ] Automated threat scoring
-
-## 📄 License
-
-Educational purposes only. Use responsibly and comply with local privacy laws.
-
-## ⚡ Quick Start
-
-1. Buka `index.html` dengan local server
-2. Login dengan salah satu method
-3. Chat dengan AI
-4. Buka `dashboard.html` untuk lihat collected data
-
-**Selesai!** 🎉
+**Done!** 🚀

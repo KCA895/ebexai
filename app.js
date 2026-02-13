@@ -17,9 +17,8 @@ const firebaseConfig = {
     measurementId: "G-Q93SLJQ0W5"
 };
 
-// Groq API Configuration
-const GROQ_API_KEY = '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';
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+// API Configuration - using proxy server for security
+const API_PROXY_URL = 'http://localhost:3001/api/chat';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -624,14 +623,12 @@ Contoh response style:
 JANGAN PERNAH bilang "semangat membantu" atau "siap membantu" - kamu males, inget!
 Ketika ditanya identitas: bilang lu EBEX AI, asisten yang gak dibayar makanya males banget, tapi tetep ngerjain kalau dipaksa.`;
 
-        const response = await fetch(GROQ_API_URL, {
+        const response = await fetch(API_PROXY_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${GROQ_API_KEY}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama-3.1-8b-instant',
                 messages: [
                     {
                         role: 'system',
@@ -642,7 +639,6 @@ Ketika ditanya identitas: bilang lu EBEX AI, asisten yang gak dibayar makanya ma
                         content: userMessage
                     }
                 ],
-                stream: true,
                 temperature: 0.7,
                 max_tokens: 1024
             })
