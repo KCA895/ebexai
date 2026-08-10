@@ -1114,7 +1114,10 @@ function createStreamingMessage() {
         <div class="message-icon bot-avatar">
             <img src="IMG_20241005_231150.jpg" alt="EBEX AI" />
         </div>
-        <div class="message-content"></div>
+        <div class="msg-stack">
+            <div class="message-content"></div>
+            ${copyBtnHTML()}
+        </div>
     `;
 
     messagesContainer.appendChild(messageDiv);
@@ -1153,9 +1156,13 @@ function addMessageToUI(sender, message) {
         ? '<div class="message-icon user-avatar">👤</div>'
         : '<div class="message-icon bot-avatar"><img src="IMG_20241005_231150.jpg" alt="EBEX AI" /></div>';
 
+    const bodyHTML = sender === 'bot'
+        ? `<div class="msg-stack"><div class="message-content">${formattedMessage}</div>${copyBtnHTML()}</div>`
+        : `<div class="message-content">${formattedMessage}</div>`;
+
     messageDiv.innerHTML = `
         ${iconHTML}
-        <div class="message-content">${formattedMessage}</div>
+        ${bodyHTML}
     `;
 
     messagesContainer.appendChild(messageDiv);
@@ -1168,6 +1175,80 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// ---- Message actions: Copy (feature #4, safe subset) ----
+function copyBtnHTML() {
+    return `<button class="msg-copy-btn" type="button" onclick="copyMessage(this)" aria-label="Salin pesan" title="Salin">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span class="copy-label">Salin</span>
+    </button>`;
+}
+
+function _fallbackCopy(text, done) {
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        done();
+    } catch (e) { /* clipboard unavailable — ignore silently */ }
+}
+
+window.copyMessage = function (btn) {
+    if (!btn) return;
+    const stack = btn.closest('.msg-stack') || btn.parentElement;
+    const contentEl = stack ? stack.querySelector('.message-content') : null;
+    const text = contentEl ? contentEl.innerText.trim() : '';
+    if (!text) return;
+    const label = btn.querySelector('.copy-label');
+    const done = () => {
+        btn.classList.add('copied');
+        if (label) label.textContent = 'tersalin';
+        setTimeout(() => {
+            btn.classList.remove('copied');
+            if (label) label.textContent = 'Salin';
+        }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => _fallbackCopy(text, done));
+    } else {
+        _fallbackCopy(text, done);
+    }
+};
+
+// ---- Interactive pet: colek to wake EBEX (feature #7) ----
+let _petSleepTimer = null;
+window.wakePet = function (petEl) {
+    if (!petEl) return;
+    const phrases = [
+        'apaan sih ganggu bobok 😾',
+        'iya iya gw bangun...',
+        'hoaaam~ ada apa?',
+        'lima menit lagi napa',
+        'gw lagi enak-enak tidur woy',
+        ' zzz— eh, colek-colek mulu'
+    ];
+    const welcome = petEl.closest('.welcome-message');
+    const caption = welcome ? welcome.querySelector('h3') : null;
+    // restart the wake animation even on repeated taps
+    petEl.classList.remove('awake');
+    void petEl.offsetWidth;
+    petEl.classList.add('awake');
+    if (caption) {
+        if (!caption.dataset.sleepText) caption.dataset.sleepText = caption.textContent;
+        caption.textContent = phrases[Math.floor(Math.random() * phrases.length)];
+    }
+    if (_petSleepTimer) clearTimeout(_petSleepTimer);
+    _petSleepTimer = setTimeout(() => {
+        petEl.classList.remove('awake');
+        if (caption && caption.dataset.sleepText) caption.textContent = caption.dataset.sleepText;
+    }, 3000);
+};
 
 // Save chat message to Firestore (updated for multi-chat)
 async function saveChatMessage(sender, message) {
@@ -1228,7 +1309,7 @@ window.loadChatMessages = async function(chatId) {
         if (snapshot.empty) {
             messagesContainer.innerHTML = `
                 <div class="welcome-message">
-                    <div class="ebex-pet">
+                    <div class="ebex-pet" role="button" tabindex="0" onclick="wakePet(this)" aria-label="Colek EBEX">
                         <div class="pet-zzz"><span>z</span><span>z</span><span>z</span></div>
                         <div class="pet-body">
                             <img src="IMG_20241005_231150.jpg" alt="EBEX AI lagi bobok" />
