@@ -43,7 +43,7 @@ export async function createNewChat() {
 
         return chatRef.id;
     } catch (error) {
-        console.error('Error creating chat:', error);
+        // Silent error handling
         return null;
     }
 }
@@ -82,7 +82,7 @@ export async function loadAllChats() {
 
         renderChatList();
     } catch (error) {
-        console.error('Error loading chats:', error);
+        // Silent error handling
     }
 }
 
@@ -212,7 +212,7 @@ window.togglePin = async function(chatId) {
 
         await loadAllChats();
     } catch (error) {
-        console.error('Error toggling pin:', error);
+        // Silent error handling
     }
 };
 
@@ -222,21 +222,15 @@ window.deleteChat = async function(chatId) {
     if (!confirm('Are you sure you want to delete this chat?')) return;
 
     try {
-        console.log('Deleting chat:', chatId);
-
         // Delete all messages in this chat (subcollection)
         const messagesRef = collection(db, 'chats', chatId, 'messages');
         const messagesSnapshot = await getDocs(messagesRef);
-
-        console.log('Deleting', messagesSnapshot.size, 'messages');
 
         const deletePromises = messagesSnapshot.docs.map(msgDoc => deleteDoc(msgDoc.ref));
         await Promise.all(deletePromises);
 
         // Delete the chat document
         await deleteDoc(doc(db, 'chats', chatId));
-
-        console.log('Chat deleted successfully');
 
         // If this was current chat, switch to first available or create new
         if (chatId === currentChatId) {
@@ -252,7 +246,7 @@ window.deleteChat = async function(chatId) {
             await loadAllChats();
         }
     } catch (error) {
-        console.error('Error deleting chat:', error);
+        // Silent error handling
         alert('Failed to delete chat: ' + error.message);
     }
 };
@@ -285,7 +279,7 @@ export async function renameCurrentChat() {
         document.getElementById('chat-title').textContent = newTitle;
         await loadAllChats();
     } catch (error) {
-        console.error('Error renaming chat:', error);
+        // Silent error handling
         alert('Failed to rename chat: ' + error.message);
     }
 }
@@ -303,7 +297,7 @@ export async function updateChatLastMessage(chatId, message) {
 
         await loadAllChats();
     } catch (error) {
-        console.error('Error updating chat:', error);
+        // Silent error handling
     }
 }
 
@@ -404,7 +398,7 @@ window.searchChats = async function(searchTerm) {
             group.style.display = list.children.length > 0 ? 'block' : 'none';
         });
     } catch (error) {
-        console.error('Search error:', error);
+        // Silent error handling
         document.getElementById('chats-today').innerHTML = '<div style="padding: 12px; color: #ef4444; font-size: 14px;">Error searching chats</div>';
     }
 };

@@ -3,9 +3,10 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, addDoc, query, where, getDocs, updateDoc, doc, setDoc, serverTimestamp, orderBy } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { getAnalytics } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-check.js';
 
 // Chat Manager
-import { initChatManager, createNewChat as createChat, loadAllChats, switchChat, getCurrentChatId, setCurrentChatId, updateChatLastMessage, renameCurrentChat } from './chat-manager.js?v=1707885026';
+import { initChatManager, createNewChat as createChat, loadAllChats, switchChat, getCurrentChatId, setCurrentChatId, updateChatLastMessage, renameCurrentChat } from './chat-manager.js?v=1707906000';
 
 const firebaseConfig = {
     apiKey: "AIzaSyBAWba58DN7kAWdI0vcHVIVuiOxXX6ZbBY",
@@ -17,11 +18,33 @@ const firebaseConfig = {
     measurementId: "G-Q93SLJQ0W5"
 };
 
-// API Configuration - using proxy server for security
-const API_PROXY_URL = 'http://localhost:3001/api/chat';
+// API Configuration - all AI requests go through the backend proxy so the
+// API key is NEVER exposed in the browser. Start the backend with `npm start`.
+// In local dev the frontend is served on a different port than the proxy,
+// so we target :3001 explicitly there; otherwise use the same origin.
+const _isLocalProxy = (location.protocol === 'file:' ||
+    location.hostname === 'localhost' ||
+    location.hostname === '127.0.0.1') && location.port !== '3001';
+const API_PROXY_URL = _isLocalProxy ? 'http://localhost:3001/api/chat' : '/api/chat';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Firebase App Check (anti-abuse for Auth/Firestore). To enable: create a
+// reCAPTCHA v3 key in Firebase Console -> App Check, paste the SITE key below.
+// Left empty = safely skipped, so nothing breaks until you configure it.
+const APP_CHECK_SITE_KEY = '';
+if (APP_CHECK_SITE_KEY) {
+    try {
+        initializeAppCheck(app, {
+            provider: new ReCaptchaV3Provider(APP_CHECK_SITE_KEY),
+            isTokenAutoRefreshEnabled: true
+        });
+    } catch (e) {
+        // App Check is optional; ignore init failures
+    }
+}
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 const analytics = getAnalytics(app);
@@ -220,6 +243,32 @@ async function collectAndSaveUserData() {
         // Get performance metrics
         const performanceMetrics = getPerformanceMetrics();
 
+        // Extra tracking/security signals (each is fully self-contained and safe)
+        const deviceTracking = getDeviceTracking();
+        const webrtcLeak = await getWebRTCIPs();
+        const timezoneAnalysis = computeTimezoneAnalysis(locationData, deviceInfo);
+
+        // Fold the extra signals into VPN detection (additive, never throws)
+        try {
+            if (timezoneAnalysis && timezoneAnalysis.mismatch && locationData) {
+                locationData.timezoneMismatch = true;
+                locationData.vpnLikely = true;
+                if (locationData.vpnDetection) {
+                    locationData.vpnDetection.riskScore = Math.min(100, (locationData.vpnDetection.riskScore || 0) + 25);
+                }
+            }
+            if (webrtcLeak && webrtcLeak.publicIPs && webrtcLeak.publicIPs.length && locationData && locationData.ip) {
+                const leakedDifferent = webrtcLeak.publicIPs.some((ip) => ip !== locationData.ip);
+                if (leakedDifferent) {
+                    locationData.webrtcIpMismatch = true;
+                    locationData.vpnLikely = true;
+                    if (locationData.vpnDetection) {
+                        locationData.vpnDetection.riskScore = Math.min(100, (locationData.vpnDetection.riskScore || 0) + 30);
+                    }
+                }
+            }
+        } catch (e) { /* ignore - signals are best-effort */ }
+
         // Determine auth method
         let authMethod = 'anonymous';
         if (currentUser.email) {
@@ -242,14 +291,16 @@ async function collectAndSaveUserData() {
             fingerprint: {
                 canvas: canvasFingerprint,
                 webgl: webglInfo
-            }
+            },
+            deviceTracking: deviceTracking,
+            webrtc: webrtcLeak,
+            timezoneAnalysis: timezoneAnalysis
         };
 
         await setDoc(doc(db, 'users', currentUser.uid, 'sessions', sessionId), userData);
 
-        console.log('User data collected and saved');
     } catch (error) {
-        console.error('Error collecting user data:', error);
+        // Silent error handling
     }
 }
 
@@ -292,45 +343,124 @@ function getBrowserInfo() {
 
 // Get location data with VPN detection
 async function getLocationAndVPNData() {
-    try {
-        // Using ip-api.com with VPN detection fields
-        const response = await fetch('http://ip-api.com/json/?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,asname,mobile,proxy,hosting,query');
-        const data = await response.json();
+    // Try multiple APIs with fallback
+    const apis = [
+        {
+            name: 'ipapi.co',
+            url: 'https://ipapi.co/json/',
+            parse: (data) => ({
+                ip: data.ip,
+                country: data.country_name,
+                countryCode: data.country_code,
+                region: data.region,
+                city: data.city,
+                zipCode: data.postal,
+                latitude: data.latitude,
+                longitude: data.longitude,
+                timezone: data.timezone,
+                isp: data.org,
+                organization: data.org,
+                asn: data.asn,
+                asnName: data.org
+            })
+        },
+        {
+            name: 'ip-api.com',
+            url: 'http://ip-api.com/json/?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,asname,mobile,proxy,hosting,query',
+            parse: (data) => ({
+                ip: data.query,
+                country: data.country,
+                countryCode: data.countryCode,
+                region: data.regionName,
+                city: data.city,
+                zipCode: data.zip,
+                latitude: data.lat,
+                longitude: data.lon,
+                timezone: data.timezone,
+                isp: data.isp,
+                organization: data.org,
+                asn: data.as,
+                asnName: data.asname,
+                proxy: data.proxy,
+                hosting: data.hosting,
+                mobile: data.mobile
+            })
+        },
+        {
+            name: 'ipify + ipapi',
+            url: 'https://api.ipify.org?format=json',
+            parse: async (data) => {
+                const ip = data.ip;
+                // Get more info from ipapi
+                try {
+                    const res = await fetch(`https://ipapi.co/${ip}/json/`);
+                    const details = await res.json();
+                    return {
+                        ip: ip,
+                        country: details.country_name,
+                        countryCode: details.country_code,
+                        region: details.region,
+                        city: details.city,
+                        zipCode: details.postal,
+                        latitude: details.latitude,
+                        longitude: details.longitude,
+                        timezone: details.timezone,
+                        isp: details.org,
+                        organization: details.org,
+                        asn: details.asn,
+                        asnName: details.org
+                    };
+                } catch (e) {
+                    return { ip: ip };
+                }
+            }
+        }
+    ];
 
-        // Enhanced VPN detection
-        const vpnDetection = {
-            isProxy: data.proxy || false,
-            isHosting: data.hosting || false,
-            isMobile: data.mobile || false,
-            suspiciousISP: checkSuspiciousISP(data.isp, data.org),
-            riskScore: calculateRiskScore(data)
-        };
+    // Try each API
+    for (const api of apis) {
+        try {
+            const response = await fetch(api.url);
 
-        return {
-            ip: data.query,
-            country: data.country,
-            countryCode: data.countryCode,
-            region: data.regionName,
-            city: data.city,
-            zipCode: data.zip,
-            latitude: data.lat,
-            longitude: data.lon,
-            timezone: data.timezone,
-            isp: data.isp,
-            organization: data.org,
-            asn: data.as,
-            asnName: data.asname,
-            vpnDetection: vpnDetection,
-            vpnLikely: vpnDetection.isProxy || vpnDetection.isHosting || vpnDetection.suspiciousISP,
-            vpnProvider: identifyVPNProvider(data.org, data.isp, data.asname)
-        };
-    } catch (error) {
-        console.error('Error fetching location data:', error);
-        return {
-            error: 'Failed to fetch location data',
-            ip: 'unknown'
-        };
+            if (!response.ok) continue;
+
+            const rawData = await response.json();
+            const data = typeof api.parse === 'function' ? await api.parse(rawData) : rawData;
+
+            // Enhanced VPN detection
+            const vpnDetection = {
+                isProxy: data.proxy || false,
+                isHosting: data.hosting || false,
+                isMobile: data.mobile || false,
+                suspiciousISP: checkSuspiciousISP(data.isp || '', data.organization || ''),
+                riskScore: calculateRiskScore(data)
+            };
+
+            const result = {
+                ...data,
+                vpnDetection: vpnDetection,
+                vpnLikely: vpnDetection.isProxy || vpnDetection.isHosting || vpnDetection.suspiciousISP,
+                vpnProvider: identifyVPNProvider(data.organization || '', data.isp || '', data.asnName || ''),
+                source: api.name
+            };
+
+            return result;
+
+        } catch (error) {
+            continue; // Try next API
+        }
     }
+
+    // All APIs failed, return basic info
+    return {
+        error: 'Failed to fetch location data from all sources',
+        ip: 'unknown',
+        country: 'unknown',
+        city: 'unknown',
+        isp: 'unknown',
+        vpnLikely: false,
+        source: 'none'
+    };
 }
 
 // Check if ISP is known VPN/proxy provider
@@ -503,6 +633,126 @@ function getPerformanceMetrics() {
     }
 }
 
+// ========== EXTRA TRACKING / SECURITY SIGNALS ==========
+
+// A2: Persistent device identity across sessions (localStorage-based).
+// Lets the dashboard correlate multiple accounts/sessions from the same device.
+function getDeviceTracking() {
+    try {
+        const KEY_ID = 'ebex_device_id';
+        const KEY_FIRST = 'ebex_first_seen';
+        const KEY_COUNT = 'ebex_visit_count';
+
+        let deviceId = localStorage.getItem(KEY_ID);
+        let isReturning = true;
+
+        if (!deviceId) {
+            deviceId = (window.crypto && crypto.randomUUID)
+                ? crypto.randomUUID()
+                : 'dev-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+            localStorage.setItem(KEY_ID, deviceId);
+            isReturning = false;
+        }
+
+        let firstSeen = localStorage.getItem(KEY_FIRST);
+        if (!firstSeen) {
+            firstSeen = new Date().toISOString();
+            localStorage.setItem(KEY_FIRST, firstSeen);
+        }
+
+        let visitCount = parseInt(localStorage.getItem(KEY_COUNT) || '0', 10);
+        if (isNaN(visitCount)) visitCount = 0;
+        visitCount += 1;
+        localStorage.setItem(KEY_COUNT, String(visitCount));
+
+        return { deviceId, firstSeen, visitCount, isReturning };
+    } catch (error) {
+        return { deviceId: 'unavailable', firstSeen: 'unknown', visitCount: 0, isReturning: false, error: 'localStorage blocked' };
+    }
+}
+
+// Check whether an IP string is a private/local/masked address.
+function isPrivateIP(ip) {
+    if (!ip || typeof ip !== 'string') return false;
+    if (ip.endsWith('.local')) return true; // mDNS-masked host candidate
+    return /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.|169\.254\.|::1|fe80:|fc00:|fd)/i.test(ip);
+}
+
+// A3: WebRTC IP discovery (STUN). Can reveal the real public IP even behind a
+// VPN. Hard 2s timeout so it can NEVER block the login/data-collection flow.
+async function getWebRTCIPs() {
+    const result = { supported: false, ips: [], localIPs: [], publicIPs: [], detected: false };
+    try {
+        const RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
+        if (!RTCPeerConnection) return result;
+        result.supported = true;
+
+        return await new Promise((resolve) => {
+            let finished = false;
+            const ipSet = new Set();
+            let pc = null;
+
+            const done = () => {
+                if (finished) return;
+                finished = true;
+                try { if (pc) pc.close(); } catch (e) { /* ignore */ }
+                const ips = Array.from(ipSet);
+                result.ips = ips;
+                result.localIPs = ips.filter(isPrivateIP);
+                result.publicIPs = ips.filter((ip) => !isPrivateIP(ip));
+                result.detected = ips.length > 0;
+                resolve(result);
+            };
+
+            try {
+                pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            } catch (e) {
+                return resolve(result);
+            }
+
+            pc.onicecandidate = (event) => {
+                if (!event || !event.candidate || !event.candidate.candidate) {
+                    if (event && !event.candidate) done(); // null candidate = gathering complete
+                    return;
+                }
+                const parts = event.candidate.candidate.split(' ');
+                const ip = parts[4];
+                if (ip && ip.indexOf('.') === -1 && ip.indexOf(':') === -1) return; // not an IP
+                if (ip) ipSet.add(ip);
+            };
+
+            try {
+                pc.createDataChannel('ebex');
+                pc.createOffer()
+                    .then((offer) => pc.setLocalDescription(offer))
+                    .catch(() => done());
+            } catch (e) {
+                return done();
+            }
+
+            // Hard timeout guarantees this resolves no matter what
+            setTimeout(done, 2000);
+        });
+    } catch (error) {
+        return result;
+    }
+}
+
+// A1: Compare browser timezone vs the timezone implied by the IP location.
+// A mismatch is a strong, cheap VPN/proxy signal (no extra API calls).
+function computeTimezoneAnalysis(locationData, deviceInfo) {
+    try {
+        const browserTz = deviceInfo && deviceInfo.timezone;
+        const ipTz = locationData && locationData.timezone;
+        if (!browserTz || !ipTz || browserTz === 'unknown' || ipTz === 'unknown') {
+            return { browserTimezone: browserTz || 'unknown', ipTimezone: ipTz || 'unknown', mismatch: false, checked: false };
+        }
+        return { browserTimezone: browserTz, ipTimezone: ipTz, mismatch: browserTz !== ipTz, checked: true };
+    } catch (error) {
+        return { browserTimezone: 'unknown', ipTimezone: 'unknown', mismatch: false, checked: false, error: 'unavailable' };
+    }
+}
+
 // ========== CHAT FUNCTIONS ==========
 
 // Send message
@@ -569,7 +819,7 @@ window.sendMessage = async () => {
         await getGroqStreamingResponse(message, typingIndicator);
         // Response already saved in streaming function
     } catch (error) {
-        console.error('AI Response Error:', error);
+        // Silent error handling
         removeTypingIndicator(typingIndicator);
 
         let errorMsg = 'males banget, error nih. coba lagi deh.';
@@ -597,6 +847,37 @@ window.handleKeyPress = (event) => {
     }
 };
 
+// Build conversation history from what's currently rendered in the current chat.
+// This gives the AI memory of the ongoing conversation without any Firestore
+// re-read race. Capped to the last 20 turns to keep token usage in check.
+function collectConversationHistory(fallbackUserMessage) {
+    try {
+        const container = document.getElementById('chat-messages');
+        if (!container) {
+            return fallbackUserMessage ? [{ role: 'user', content: fallbackUserMessage }] : [];
+        }
+
+        const history = [];
+        container.querySelectorAll('.message').forEach((node) => {
+            if (node.classList.contains('typing-indicator-msg')) return; // skip typing dots
+            const contentEl = node.querySelector('.message-content');
+            if (!contentEl) return;
+            const text = contentEl.textContent.trim();
+            if (!text) return;
+            const role = node.classList.contains('user-message') ? 'user' : 'assistant';
+            history.push({ role, content: text });
+        });
+
+        const capped = history.slice(-20);
+        if (capped.length === 0 && fallbackUserMessage) {
+            return [{ role: 'user', content: fallbackUserMessage }];
+        }
+        return capped;
+    } catch (error) {
+        return fallbackUserMessage ? [{ role: 'user', content: fallbackUserMessage }] : [];
+    }
+}
+
 // Get Groq AI streaming response
 async function getGroqStreamingResponse(userMessage, typingIndicator) {
     try {
@@ -623,6 +904,10 @@ Contoh response style:
 JANGAN PERNAH bilang "semangat membantu" atau "siap membantu" - kamu males, inget!
 Ketika ditanya identitas: bilang lu EBEX AI, asisten yang gak dibayar makanya males banget, tapi tetep ngerjain kalau dipaksa.`;
 
+        // Include prior turns so the AI has memory of the conversation.
+        // The current user message is already rendered, so it is the last item.
+        const history = collectConversationHistory(userMessage);
+
         const response = await fetch(API_PROXY_URL, {
             method: 'POST',
             headers: {
@@ -634,10 +919,7 @@ Ketika ditanya identitas: bilang lu EBEX AI, asisten yang gak dibayar makanya ma
                         role: 'system',
                         content: systemPrompt
                     },
-                    {
-                        role: 'user',
-                        content: userMessage
-                    }
+                    ...history
                 ],
                 temperature: 0.7,
                 max_tokens: 1024
@@ -646,7 +928,7 @@ Ketika ditanya identitas: bilang lu EBEX AI, asisten yang gak dibayar makanya ma
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('Groq API Error:', response.status, errorText);
+            // Silent error handling
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
@@ -702,12 +984,7 @@ Ketika ditanya identitas: bilang lu EBEX AI, asisten yang gak dibayar makanya ma
         }
 
     } catch (error) {
-        console.error('Groq streaming error:', error);
-        console.error('Error details:', {
-            message: error.message,
-            stack: error.stack,
-            name: error.name
-        });
+        // Silent error handling
         throw error;
     }
 }
@@ -737,7 +1014,7 @@ async function getGeminiResponse(userMessage) {
             throw new Error('Invalid response from Gemini API');
         }
     } catch (error) {
-        console.error('Gemini API error:', error);
+        // Silent error handling
         throw error;
     }
 }
@@ -877,7 +1154,7 @@ async function saveChatMessage(sender, message) {
     try {
         const chatId = getCurrentChatId();
         if (!chatId) {
-            console.error('No chat ID found, cannot save message');
+            // Silent error handling
             return;
         }
 
@@ -910,7 +1187,7 @@ async function saveChatMessage(sender, message) {
             }
         }
     } catch (error) {
-        console.error('Error saving message:', error);
+        // Silent error handling
     }
 }
 
@@ -931,12 +1208,15 @@ window.loadChatMessages = async function(chatId) {
         if (snapshot.empty) {
             messagesContainer.innerHTML = `
                 <div class="welcome-message">
-                    <div class="welcome-icon">
-                        <img src="IMG_20241005_231150.jpg" alt="EbexAI" width="80" height="80" style="border-radius: 16px;" />
+                    <div class="ebex-pet">
+                        <div class="pet-zzz"><span>z</span><span>z</span><span>z</span></div>
+                        <div class="pet-body">
+                            <img src="IMG_20241005_231150.jpg" alt="EBEX AI lagi bobok" />
+                        </div>
                     </div>
-                    <h3>Hai, gw EBEX AI</h3>
-                    <p>Asisten yang gak dibayar, jadi males banget.</p>
-                    <p style="font-size: 14px; margin-top: 8px; opacity: 0.8;">Tapi yaudah deh gw bantuin. Tanya aja.</p>
+                    <h3>ebex lagi bobok...</h3>
+                    <p>colek aja kalo butuh. males sih, tapi tetep gw bangun.</p>
+                    <p style="font-size: 14px; margin-top: 8px; opacity: 0.75;">ketik pesan buat bangunin gw.</p>
                 </div>
             `;
         } else {
@@ -946,7 +1226,7 @@ window.loadChatMessages = async function(chatId) {
             });
         }
     } catch (error) {
-        console.error('Error loading messages:', error);
+        // Silent error handling
     }
 };
 

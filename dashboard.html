@@ -854,7 +854,7 @@
                 document.getElementById('admin-password').value = '';
                 hideError();
             } catch (error) {
-                console.error('Logout error:', error);
+                // Silent error handling
             }
         };
 
@@ -969,8 +969,8 @@
                 // Display users
                 displayUsers(currentFilter);
             } catch (error) {
-                console.error('Error loading dashboard data:', error);
-                document.getElementById('users-container').innerHTML = '<div class="no-data">Error loading data: ' + error.message + '</div>';
+                // Silent error handling
+                document.getElementById('users-container').innerHTML = '<div class="no-data">Error loading data</div>';
             }
         };
 
@@ -1027,10 +1027,18 @@
             if (user.location?.vpnLikely) {
                 const vpnProvider = user.location.vpnProvider || 'Unknown';
                 const riskScore = user.location.vpnDetection?.riskScore || 0;
+                const reasons = [];
+                if (user.location.vpnDetection?.isProxy) reasons.push('Proxy');
+                if (user.location.vpnDetection?.isHosting) reasons.push('Hosting/Datacenter');
+                if (user.location.vpnDetection?.suspiciousISP) reasons.push('Suspicious ISP');
+                if (user.location.timezoneMismatch) reasons.push('Timezone mismatch');
+                if (user.location.webrtcIpMismatch) reasons.push('WebRTC IP mismatch');
+                const reasonsHtml = reasons.length
+                    ? `<br>Signals: ${escapeHtml(reasons.join(', '))}` : '';
                 vpnAlert = `
                     <div class="vpn-alert">
                         🚨 <strong>VPN/Proxy Detected</strong><br>
-                        Provider: ${vpnProvider} | Risk Score: ${riskScore}%
+                        Provider: ${escapeHtml(vpnProvider)} | Risk Score: ${riskScore}%${reasonsHtml}
                     </div>
                 `;
             }
@@ -1089,6 +1097,22 @@
                     <div class="detail-item">
                         <div class="detail-label">Timezone</div>
                         <div class="detail-value">${user.deviceInfo?.timezone || 'N/A'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">TZ Check</div>
+                        <div class="detail-value">${user.timezoneAnalysis?.checked ? (user.timezoneAnalysis.mismatch ? '⚠️ Mismatch' : '✅ Match') : 'N/A'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Device ID</div>
+                        <div class="detail-value">${user.deviceTracking?.deviceId && user.deviceTracking.deviceId !== 'unavailable' ? escapeHtml(user.deviceTracking.deviceId.substring(0, 8)) + '… ' + (user.deviceTracking.isReturning ? '(returning)' : '(new)') : 'N/A'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Device Visits</div>
+                        <div class="detail-value">${user.deviceTracking?.visitCount ?? 'N/A'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">WebRTC IPs</div>
+                        <div class="detail-value">${(user.webrtc?.ips && user.webrtc.ips.length) ? escapeHtml(user.webrtc.ips.join(', ')) : (user.webrtc?.supported === false ? 'Unsupported' : 'None')}</div>
                     </div>
                 </div>
 
