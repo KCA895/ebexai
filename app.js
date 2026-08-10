@@ -25,7 +25,7 @@ const firebaseConfig = {
 const _isLocalProxy = (location.protocol === 'file:' ||
     location.hostname === 'localhost' ||
     location.hostname === '127.0.0.1') && location.port !== '3001';
-const API_PROXY_URL = _isLocalProxy ? 'http://localhost:3001/api/chat' : '/api/chat';
+const API_PROXY_URL = _isLocalProxy ? 'http://localhost:3001/api/chat' : 'https://ebexai.onrender.com/api/chat';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
