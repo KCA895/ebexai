@@ -841,3 +841,33 @@ button:active { box-shadow: var(--nm-pressed-sm); transform: translateY(1px); }
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ========== MOBILE FIXES: login scroll + sidebar overlay ========== */
+
+/* Login screen must be scrollable when content is taller than the viewport
+   (small phones, on-screen keyboard). */
+.auth-container {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Backdrop behind the slide-in sidebar on mobile. Hidden on desktop. */
+.sidebar-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 18, 15, 0.40);
+    z-index: 99;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@media (max-width: 1024px) {
+    /* Show backdrop only while the sidebar is open */
+    .chat-sidebar:not(.collapsed) ~ .sidebar-overlay { display: block; }
+}
+
+@media (max-width: 768px) {
+    /* Anchor to top so tall content scrolls instead of getting clipped */
+    .auth-container { align-items: flex-start; }
+    .auth-box { min-height: 100dvh; justify-content: center; }
+}

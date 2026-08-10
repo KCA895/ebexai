@@ -1,6 +1,6 @@
 // Firebase Configuration
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { getFirestore, collection, addDoc, query, where, getDocs, updateDoc, doc, setDoc, serverTimestamp, orderBy } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { getAnalytics } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-check.js';
@@ -122,13 +122,28 @@ window.emailSignup = async () => {
     }
 };
 
-// Google Login
+// Google Login — popup on desktop, redirect on mobile (popups get blocked there)
 window.googleLogin = async () => {
     const provider = new GoogleAuthProvider();
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 768;
     try {
-        await signInWithPopup(auth, provider);
+        if (isMobile) {
+            await signInWithRedirect(auth, provider);
+        } else {
+            await signInWithPopup(auth, provider);
+        }
     } catch (error) {
-        alert('Google login failed: ' + error.message);
+        // Popup blocked/closed -> fall back to full-page redirect
+        if (error.code === 'auth/popup-blocked' ||
+            error.code === 'auth/cancelled-popup-request' ||
+            error.code === 'auth/popup-closed-by-user') {
+            try { await signInWithRedirect(auth, provider); return; } catch (e) { /* fall through */ }
+        }
+        if (error.code === 'auth/unauthorized-domain') {
+            alert('Google login gagal: domain belum diizinkan.\nTambahkan "ebex.chat" di Firebase Console → Authentication → Settings → Authorized domains.');
+        } else {
+            alert('Google login gagal: ' + (error.code || error.message));
+        }
     }
 };
 
@@ -166,6 +181,11 @@ onAuthStateChanged(auth, async (user) => {
         document.getElementById('auth-container').style.display = 'none';
         document.getElementById('bubble-canvas').style.display = 'none';
         document.getElementById('chat-container').style.display = 'flex';
+
+        // On mobile, start with the sidebar closed so it doesn't cover the chat
+        if (window.innerWidth <= 1024) {
+            document.getElementById('chat-sidebar').classList.add('collapsed');
+        }
 
         // Initialize chat manager
         initChatManager(db, currentUser.uid);
